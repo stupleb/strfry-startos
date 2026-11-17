@@ -41,7 +41,7 @@ The package builds its own image from strfry's source.
 | Architectures | x86_64, aarch64                                                                                                                                        |
 | User          | `strfry` (uid 1000)                                                                                                                                    |
 | Command       | `strfry --config=/etc/strfry/strfry.conf relay`, after raising the open-file limit to the container's hard limit                                       |
-| Extra tools   | `jq`, which runs the write policy; `strfry-signup`, the package's own sign-up service, built from `signup/`                                            |
+| Extra tools   | `jq`, which runs the write policy; `strfry-signup`, the package's own sign-up service, built from the `strfry-signup/` submodule                       |
 
 Subcontainers: `strfry-sub` runs the relay, and `signup-sub` runs `strfry-signup` while **Paid Access** is on. The import and delete actions run their `strfry` commands inside `strfry-sub` while the relay runs, and in a short-lived subcontainer named after the action (`import-relay`, `import-pubkey`, `delete-events`) while it is stopped. LMDB tells its processes apart by PID, so a second subcontainer, with its own PID namespace, cannot open the database while the relay has it open.
 
@@ -92,7 +92,7 @@ The relay URL defaults to the interface's preferred address (a public domain, el
 
 ## Sign-up Service
 
-`strfry-signup` (Go, `signup/`) serves the page and a small JSON API on port 8080. Its settings, payment credentials included, arrive as environment variables (`SIGNUP_*`, `RELAY_*`) set from `store.json` and the relay URL at each start, so **Configure Paid Access**, **Relay Info** and **Write Access** mode changes restart it.
+`strfry-signup` (Go, the `strfry-signup/` submodule; [stupleb/strfry-signup](https://github.com/stupleb/strfry-signup) documents the program in full) serves the page and a small JSON API on port 8080. Its settings, payment credentials included, arrive as environment variables (`SIGNUP_*`, `RELAY_*`) set from `store.json` and the relay URL at each start, so **Configure Paid Access**, **Relay Info** and **Write Access** mode changes restart it.
 
 - `GET /`: the page, an HTML template with the relay's name, description, icon, URL, terms, privacy link, contact and price. `app.js` and `app.css` are served beside it; the content security policy allows only same-origin scripts, styles and requests, plus `https:` and `data:` images.
 - `GET /api/member/{npub or hex}`: whether the key is a member, until when, whether it is blocked, and its npub.
@@ -106,6 +106,8 @@ A second listener on `127.0.0.1:8081`, which no interface binds, takes the opera
 Invoices last 15 minutes. A poller asks the backend about each open invoice every 3 seconds, every minute once it has expired or is waiting for confirmations, and gives up 10 minutes after expiry (48 hours for a `processing` one), or 24 hours after expiry while the backend keeps returning errors. A payment credits the key: `until` becomes the later of now and the current `until`, plus the period in force when the invoice was created. LNbits invoices come from `POST /api/v1/payments` with the wallet's invoice key; BTCPay invoices are created in `SATS` with `checkout.expirationMinutes = 15`, and their `BTC-LN` payment method is activated at once; `BTC-CHAIN` waits for the visitor to ask for it, so unpaid invoices do not derive wallet addresses (a store without Lightning gets it at once). `Settled` counts as paid; `Expired` and `Invalid` as expired. Requests to the backend never follow redirects.
 
 A Root CA stored with a remote backend is passed in `SIGNUP_ROOT_CA` and trusted alongside the public roots.
+
+The page, its messages, the API's errors and the invoice memo are in English, Spanish, German, Polish or French: the language picked in the menu under the page's footer (`?lang=`), else the browser's, else English. The relay's name and description appear as entered.
 
 The page takes no payment while the write mode is open, and shows that payments are unavailable when the backend has no address (a local one not installed).
 
@@ -151,7 +153,7 @@ Both volumes are copied whole (`ofVolumes('startos', 'main')`) with strfry stopp
 4. The write policy matches pubkeys only; it has no rate limiting or content filtering.
 5. Every strfry setting not listed under File Models stays at its compiled-in default, and the `strfry router` mirroring daemon is not run.
 6. On aarch64 the database cannot grow past 256 GiB.
-7. The sign-up page is in English only, prices are in sats only, and there are no refunds or partial payments: an underpaid or late BTCPay invoice is left to the operator, who can settle it in BTCPay and then grant the key with **Edit Paid Member**.
+7. Prices are in sats only, and there are no refunds or partial payments: an underpaid or late BTCPay invoice is left to the operator, who can settle it in BTCPay and then grant the key with **Edit Paid Member**.
 8. BTCPay's `Settled` counts as paid, so the store's payment tolerance and its speed policy decide whether an underpaid or unconfirmed on-chain payment buys access.
 9. Paid members are tracked by the package, not by LNbits or BTCPay Server: restoring the backend alone does not restore memberships.
 

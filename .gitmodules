@@ -1,3 +1,6 @@
 [submodule "strfry"]
 	path = strfry
 	url = https://github.com/hoytech/strfry.git
+[submodule "strfry-signup"]
+	path = strfry-signup
+	url = https://github.com/stupleb/strfry-signup.git

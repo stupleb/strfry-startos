@@ -43,7 +43,7 @@ Changes to the list of keys apply at once. **Blocked Public Keys** are refused i
 
 **Paid Members** lists who has paid and until when. To change a member's expiry date, remove them or ban them, copy their key from there and run **Edit Paid Member**. It also grants access to a key that hasn't paid, for example when you settle a late or underpaid BTCPay invoice by hand. A banned key goes into **Blocked Public Keys**, so it can neither publish nor pay again; to lift a ban, delete the key from that list in **Write Access**. Turning **Paid Access** off takes the page down; members keep what they paid for.
 
-The page is in English. It shows the relay's name, description, icon, terms, privacy and contact links from **Relay Info**, so fill those in first.
+The page follows the visitor's browser language if it's English, Spanish, German, Polish or French, falling back to English, and links at the bottom switch it. It shows the relay's name, description, icon, terms, privacy and contact links from **Relay Info**, as you entered them, so fill those in first.
 
 ### Relay URL
 

@@ -36,9 +36,9 @@ FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27-alpine AS signup
 
 ARG TARGETARCH
 WORKDIR /src
-COPY signup/go.mod signup/go.sum ./
+COPY strfry-signup/go.mod strfry-signup/go.sum ./
 RUN go mod download
-COPY signup/ ./
+COPY strfry-signup/ ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath -ldflags='-s -w' -o /strfry-signup .
 
 FROM docker.io/library/alpine:3.24
