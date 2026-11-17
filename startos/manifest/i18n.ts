@@ -8,13 +8,39 @@ export const short = {
 
 export const long = {
   en_US:
-    "strfry is a fast Nostr relay that keeps every event in an embedded database. Use it as your own relay, a relay for a group, or a public one. On StartOS you choose who can publish: only the public keys you list, those keys plus anyone tagging them, or anyone. Anyone can read what it stores. Actions set the relay information clients show, import a public key's history from another relay, copy events from another strfry relay with negentropy sync, and delete events by author or ID.",
+    "strfry is a fast Nostr relay that keeps every event in an embedded database. Use it as your own relay, a relay for a group, or a public one. On StartOS you choose who can publish: only the public keys you list, those keys plus anyone tagging them, or anyone, and you can sell write access through a public sign-up page paid with LNbits or BTCPay Server. Anyone can read what it stores. Actions set the relay information clients show, import a public key's history from another relay, copy events from another strfry relay with negentropy sync, and delete events by author or ID.",
   es_ES:
-    'strfry es un relay de Nostr rápido que guarda cada evento en una base de datos integrada. Úsalo como tu propio relay, como relay de un grupo o como relay público. En StartOS eliges quién puede publicar: solo las claves públicas que indiques, esas claves y quien las etiquete, o cualquiera. Cualquiera puede leer lo que almacena. Las acciones definen la información del relay que muestran los clientes, importan el historial de una clave pública desde otro relay, copian eventos de otro relay strfry mediante sincronización negentropy y eliminan eventos por autor o ID.',
+    'strfry es un relay de Nostr rápido que guarda cada evento en una base de datos integrada. Úsalo como tu propio relay, como relay de un grupo o como relay público. En StartOS eliges quién puede publicar: solo las claves públicas que indiques, esas claves y quien las etiquete, o cualquiera, y puedes vender el acceso de escritura mediante una página de registro pública que se paga con LNbits o BTCPay Server. Cualquiera puede leer lo que almacena. Las acciones definen la información del relay que muestran los clientes, importan el historial de una clave pública desde otro relay, copian eventos de otro relay strfry mediante sincronización negentropy y eliminan eventos por autor o ID.',
   de_DE:
-    'strfry ist ein schnelles Nostr-Relay, das jedes Event in einer eingebetteten Datenbank speichert. Nutze es als eigenes Relay, als Relay für eine Gruppe oder als öffentliches Relay. Auf StartOS legst du fest, wer veröffentlichen darf: nur die öffentlichen Schlüssel, die du einträgst, diese Schlüssel und alle, die sie markieren, oder jeder. Lesen kann jeder, was es speichert. Aktionen legen die Relay-Informationen fest, die Clients anzeigen, importieren den Verlauf eines öffentlichen Schlüssels von einem anderen Relay, kopieren Events per Negentropy-Synchronisation von einem anderen strfry-Relay und löschen Events nach Autor oder ID.',
+    'strfry ist ein schnelles Nostr-Relay, das jedes Event in einer eingebetteten Datenbank speichert. Nutze es als eigenes Relay, als Relay für eine Gruppe oder als öffentliches Relay. Auf StartOS legst du fest, wer veröffentlichen darf: nur die öffentlichen Schlüssel, die du einträgst, diese Schlüssel und alle, die sie markieren, oder jeder, und du kannst Schreibzugriff über eine öffentliche Anmeldeseite verkaufen, bezahlt mit LNbits oder BTCPay Server. Lesen kann jeder, was es speichert. Aktionen legen die Relay-Informationen fest, die Clients anzeigen, importieren den Verlauf eines öffentlichen Schlüssels von einem anderen Relay, kopieren Events per Negentropy-Synchronisation von einem anderen strfry-Relay und löschen Events nach Autor oder ID.',
   pl_PL:
-    'strfry to szybki przekaźnik Nostr, który przechowuje każde zdarzenie we wbudowanej bazie danych. Użyj go jako własnego przekaźnika, przekaźnika dla grupy lub publicznego. Na StartOS wybierasz, kto może publikować: tylko wpisane przez ciebie klucze publiczne, te klucze oraz każdy, kto je oznacza, albo każdy. To, co przechowuje, może czytać każdy. Akcje ustawiają informacje o przekaźniku wyświetlane przez klientów, importują historię klucza publicznego z innego przekaźnika, kopiują zdarzenia z innego przekaźnika strfry przez synchronizację negentropy i usuwają zdarzenia według autora lub ID.',
+    'strfry to szybki przekaźnik Nostr, który przechowuje każde zdarzenie we wbudowanej bazie danych. Użyj go jako własnego przekaźnika, przekaźnika dla grupy lub publicznego. Na StartOS wybierasz, kto może publikować: tylko wpisane przez ciebie klucze publiczne, te klucze oraz każdy, kto je oznacza, albo każdy, a dostęp do zapisu możesz sprzedawać przez publiczną stronę rejestracji opłacaną przez LNbits lub BTCPay Server. To, co przechowuje, może czytać każdy. Akcje ustawiają informacje o przekaźniku wyświetlane przez klientów, importują historię klucza publicznego z innego przekaźnika, kopiują zdarzenia z innego przekaźnika strfry przez synchronizację negentropy i usuwają zdarzenia według autora lub ID.',
   fr_FR:
-    "strfry est un relais Nostr rapide qui conserve chaque événement dans une base de données intégrée. Utilisez-le comme votre propre relais, comme relais pour un groupe ou comme relais public. Sur StartOS, vous choisissez qui peut publier : seulement les clés publiques que vous indiquez, ces clés et toute personne qui les mentionne, ou tout le monde. Tout le monde peut lire ce qu'il stocke. Les actions définissent les informations du relais affichées par les clients, importent l'historique d'une clé publique depuis un autre relais, copient les événements d'un autre relais strfry par synchronisation negentropy et suppriment des événements par auteur ou par ID.",
+    "strfry est un relais Nostr rapide qui conserve chaque événement dans une base de données intégrée. Utilisez-le comme votre propre relais, comme relais pour un groupe ou comme relais public. Sur StartOS, vous choisissez qui peut publier : seulement les clés publiques que vous indiquez, ces clés et toute personne qui les mentionne, ou tout le monde, et vous pouvez vendre l'accès en écriture via une page d'inscription publique payée avec LNbits ou BTCPay Server. Tout le monde peut lire ce qu'il stocke. Les actions définissent les informations du relais affichées par les clients, importent l'historique d'une clé publique depuis un autre relais, copient les événements d'un autre relais strfry par synchronisation negentropy et suppriment des événements par auteur ou par ID.",
+}
+
+export const depLnbitsDescription = {
+  en_US:
+    'Takes payments for write access when Paid Access uses LNbits on this server.',
+  es_ES:
+    'Cobra el acceso de escritura cuando Acceso de pago usa LNbits en este servidor.',
+  de_DE:
+    'Nimmt Zahlungen für Schreibzugriff entgegen, wenn Bezahlter Zugang LNbits auf diesem Server nutzt.',
+  pl_PL:
+    'Przyjmuje płatności za dostęp do zapisu, gdy Płatny dostęp korzysta z LNbits na tym serwerze.',
+  fr_FR:
+    "Encaisse les paiements de l'accès en écriture quand Accès payant utilise LNbits sur ce serveur.",
+}
+
+export const depBtcpayDescription = {
+  en_US:
+    'Takes payments for write access when Paid Access uses BTCPay Server on this server.',
+  es_ES:
+    'Cobra el acceso de escritura cuando Acceso de pago usa BTCPay Server en este servidor.',
+  de_DE:
+    'Nimmt Zahlungen für Schreibzugriff entgegen, wenn Bezahlter Zugang BTCPay Server auf diesem Server nutzt.',
+  pl_PL:
+    'Przyjmuje płatności za dostęp do zapisu, gdy Płatny dostęp korzysta z BTCPay Server na tym serwerze.',
+  fr_FR:
+    "Encaisse les paiements de l'accès en écriture quand Accès payant utilise BTCPay Server sur ce serveur.",
 }

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>{{if .Relay.Name}}{{.Relay.Name}}: {{end}}write access</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        {{if .Relay.Icon}}<img class="icon" src="{{.Relay.Icon}}" alt="" />{{end}}
+        <h1>{{if .Relay.Name}}{{.Relay.Name}}{{else}}Nostr relay{{end}}</h1>
+        {{if .Relay.Description}}<p class="description">{{.Relay.Description}}</p>{{end}}
+        {{if .Relay.URL}}<p class="relay-url"><code>{{.Relay.URL}}</code></p>{{end}}
+      </header>
+
+      {{if not .Accepting}}
+      <section class="notice">
+        Anyone can publish to this relay right now, so there is nothing to pay
+        for.
+      </section>
+      {{else if not .Available}}
+      <section class="notice">
+        This relay is not taking payments right now. Try again later.
+      </section>
+      {{else}}
+      <section id="offer">
+        <p class="price">
+          <strong>{{sats .PriceSats}} sats</strong>
+          {{if .PeriodDays}}for {{.PeriodDays}} days of write access{{else}}for
+          permanent write access{{end}}
+        </p>
+        <p>
+          Reading is free. Paying lets the public key below publish to this
+          relay.
+        </p>
+        <form id="key-form">
+          <label for="pubkey">Your public key</label>
+          <div class="row">
+            <input
+              id="pubkey"
+              name="pubkey"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="Paste your npub1…"
+              aria-describedby="status"
+              required
+            />
+            <button type="button" id="use-extension" hidden>
+              Use extension
+            </button>
+          </div>
+        </form>
+        <p id="status" role="status"></p>
+        <button type="button" id="pay" class="primary" hidden></button>
+      </section>
+
+      <section id="invoice" hidden>
+        <p class="for-key">For <code id="invoice-key"></code></p>
+        <p id="invoice-status" role="status"></p>
+        <div class="tabs" id="tabs" hidden>
+          <button type="button" data-tab="lightning">Lightning</button>
+          <button type="button" data-tab="onchain">On-chain</button>
+        </div>
+        <div id="lightning" class="pay-panel">
+          <a id="ln-qr-link"><img id="ln-qr" alt="Lightning invoice" /></a>
+          <a id="ln-link" class="button primary">Open in wallet</a>
+          <textarea
+            id="ln-text"
+            readonly
+            rows="4"
+            aria-label="Lightning invoice"
+          ></textarea>
+          <button type="button" class="copy" data-copy="ln-text">
+            Copy invoice
+          </button>
+        </div>
+        <div id="onchain" class="pay-panel" hidden>
+          <a id="chain-qr-link"><img id="chain-qr" alt="Bitcoin address" /></a>
+          <a id="chain-link" class="button primary">Open in wallet</a>
+          <input id="chain-text" readonly aria-label="Bitcoin address" />
+          <button type="button" class="copy" data-copy="chain-text">
+            Copy address
+          </button>
+        </div>
+        <div id="next-step" class="next-step" hidden>
+          {{if .Relay.URL}}
+          <p>Add this relay to your Nostr client to publish here:</p>
+          <div class="row">
+            <input
+              id="relay-url"
+              readonly
+              value="{{.Relay.URL}}"
+              aria-label="Relay address"
+            />
+            <button type="button" class="copy" data-copy="relay-url">
+              Copy
+            </button>
+          </div>
+          {{else}}
+          <p>Add this relay to your Nostr client to publish here.</p>
+          {{end}}
+        </div>
+        <div class="actions">
+          <button type="button" id="renew" class="primary" hidden>
+            Get a new invoice
+          </button>
+          <button type="button" id="back">Back</button>
+        </div>
+      </section>
+      {{end}}
+
+      <noscript>
+        <section class="notice">
+          This page needs JavaScript to create an invoice.
+        </section>
+      </noscript>
+
+      <footer>
+        {{if .Relay.Terms}}<a href="{{.Relay.Terms}}" rel="noopener noreferrer">Terms</a>{{end}}
+        {{if .Relay.Privacy}}<a href="{{.Relay.Privacy}}" rel="noopener noreferrer">Privacy</a>{{end}}
+        {{if .ContactHref}}<span>Contact: <a href="{{.ContactHref}}">{{.ContactText}}</a></span>{{else if .Relay.Contact}}<span>Contact: {{.Relay.Contact}}</span>{{end}}
+      </footer>
+    </main>
+    <script
+      src="app.js"
+      data-price="{{.PriceSats}}"
+      data-period-days="{{.PeriodDays}}"
+    ></script>
+  </body>
+</html>

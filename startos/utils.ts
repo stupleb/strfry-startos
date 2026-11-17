@@ -1,16 +1,26 @@
 import type { SubContainer, T } from '@start9labs/start-sdk'
 import { mkdir, rename, writeFile } from 'node:fs/promises'
-import type { Store } from './fileModels/store.json'
+import { signupState, type Members } from './fileModels/signupState.json'
+import { storeJson, type Store } from './fileModels/store.json'
 import { i18n } from './i18n'
 import type { manifest } from './manifest'
 import { sdk } from './sdk'
 
 export const relayPort = 7777
+export const signupPort = 8080
+export const signupAdminPort = 8081
 export const appUid = 1000
 
+// host ids and internal ports from lnbits-startos's and btcpayserver-startos's startos/utils.ts
+export const backendHosts = {
+  lnbits: { packageId: 'lnbits', hostId: 'main', internalPort: 5000 },
+  btcpay: { packageId: 'btcpayserver', hostId: 'main', internalPort: 23000 },
+} as const
+
 const etcDir = `${sdk.volumes.startos.path}/etc`
-const confPath = '/etc/strfry/strfry.conf'
-const policyPath = '/etc/strfry/write-policy'
+export const etcMount = '/etc/strfry'
+const confPath = `${etcMount}/strfry.conf`
+const policyPath = `${etcMount}/write-policy`
 
 export const mounts = sdk.Mounts.of()
   .mountVolume({
@@ -22,9 +32,28 @@ export const mounts = sdk.Mounts.of()
   .mountVolume({
     volumeId: 'startos',
     subpath: 'etc',
-    mountpoint: '/etc/strfry',
+    mountpoint: etcMount,
     readonly: true,
   })
+
+export const signupDir = `${sdk.volumes.startos.path}/signup`
+
+export const signupMounts = sdk.Mounts.of()
+  .mountVolume({
+    volumeId: 'startos',
+    subpath: 'signup',
+    mountpoint: '/var/lib/signup',
+    readonly: false,
+  })
+  .mountVolume({
+    volumeId: 'startos',
+    subpath: 'etc',
+    mountpoint: etcMount,
+    readonly: true,
+  })
+
+export const day = (seconds: number) =>
+  new Date(seconds * 1000).toISOString().slice(0, 10)
 
 type StrfrySub = SubContainer<typeof manifest>
 
@@ -113,6 +142,37 @@ const bech32Bytes = (value: string, prefix: string) => {
   return bytes
 }
 
+export function toNpub(hex: string) {
+  const words: number[] = []
+  let acc = 0
+  let bits = 0
+  for (const byte of Buffer.from(hex, 'hex')) {
+    acc = ((acc << 8) | byte) & 0xfff
+    bits += 8
+    while (bits >= 5) {
+      bits -= 5
+      words.push((acc >> bits) & 31)
+    }
+  }
+  if (bits) words.push((acc << (5 - bits)) & 31)
+  const hrp = 'npub'.split('').map((c) => c.charCodeAt(0))
+  const poly =
+    bech32Polymod([
+      ...hrp.map((c) => c >> 5),
+      0,
+      ...hrp.map((c) => c & 31),
+      ...words,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+    ]) ^ 1
+  for (let i = 0; i < 6; i++) words.push((poly >> (5 * (5 - i))) & 31)
+  return `npub1${words.map((w) => bech32Charset[w]).join('')}`
+}
+
 const hex32 = (bytes?: number[]) =>
   bytes?.length === 32 ? Buffer.from(bytes).toString('hex') : undefined
 
@@ -148,9 +208,28 @@ const writeAtomic = async (name: string, data: string, mode: number) => {
   await rename(`${etcDir}/.${name}.tmp`, `${etcDir}/${name}`)
 }
 
+const sellsAccess = (store: Pick<Store, 'payments' | 'writeMode'>) =>
+  store.payments.backend !== 'off' && store.writeMode !== 'open'
+
+const fees = ({ priceSats, periodDays }: Store['payments']) =>
+  periodDays
+    ? {
+        subscription: [
+          {
+            amount: priceSats * 1000,
+            unit: 'msats',
+            period: periodDays * 86400,
+          },
+        ],
+      }
+    : { admission: [{ amount: priceSats * 1000, unit: 'msats' }] }
+
 export const writeConfig = (
-  store: Omit<Store, 'allowedPubkeys'>,
+  store: Pick<Store, 'info' | 'writeMode' | 'acceptOldEvents' | 'payments'> & {
+    blocking: boolean
+  },
   relayUrl: string | null,
+  signupUrl: string | null,
 ) =>
   writeAtomic(
     'strfry.conf',
@@ -173,9 +252,17 @@ export const writeConfig = (
           nofiles: 0,
           realIpHeader: 'x-forwarded-for',
           auth: { enabled: true, serviceUrl: relayUrl ?? '' },
-          info: store.info,
+          info: {
+            ...store.info,
+            restrictedWrites: store.writeMode !== 'open' ? 'true' : 'false',
+            paymentsUrl: (sellsAccess(store) && signupUrl) || '',
+            fees: sellsAccess(store)
+              ? JSON.stringify(fees(store.payments))
+              : '',
+          },
           writePolicy: {
-            plugin: store.writeMode === 'open' ? '' : policyPath,
+            plugin:
+              store.writeMode === 'open' && !store.blocking ? '' : policyPath,
           },
         },
       },
@@ -185,28 +272,70 @@ export const writeConfig = (
     0o644,
   )
 
-export const writePolicy = (store: Store) => {
-  const allow = JSON.stringify(
-    Object.fromEntries(store.allowedPubkeys.map((k) => [k, true])),
-  )
-  const inbox =
-    store.writeMode === 'inbox'
-      ? ' or any($e.tags[]?; .[0] == "p" and ($allow[.[1] | tostring] // false))'
-      : ''
+const shellQuote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`
+
+export const writePolicy = async (
+  store: Store,
+  members: Members | null,
+  signupUrl: string | null,
+) => {
+  const now = Date.now() / 1000
+  const allow = {
+    listed: Object.fromEntries(store.allowedPubkeys.map((k) => [k, true])),
+    paid: Object.fromEntries(
+      Object.entries(members ?? {})
+        .filter(([, m]) => m.until === null || m.until > now)
+        .map(([k, m]) => [k, m.until ?? true]),
+    ),
+  }
+  const block = Object.fromEntries(store.blockedPubkeys.map((k) => [k, true]))
+  const msg =
+    sellsAccess(store) && signupUrl
+      ? `restricted: pay for write access at ${signupUrl}`
+      : 'blocked: this relay does not accept events from this pubkey'
+  const allowed =
+    store.writeMode === 'open'
+      ? 'true'
+      : `member($e.pubkey)${
+          store.writeMode === 'inbox'
+            ? ' or any($e.tags[]?; .[0] == "p" and ($allow[0].listed[.[1] | tostring] // false))'
+            : ''
+        }`
   const program = [
+    'def member($k): ($allow[0].listed[$k] // $allow[0].paid[$k] // false) as $v | $v == true or (($v | type) == "number" and $v > now);',
     'select(.type == "new")',
     '| .event as $e',
-    `| if (.sourceType | IN("IP4", "IP6") | not) or ($allow[$e.pubkey] // false)${inbox}`,
-    '  then {id: $e.id, action: "accept"}',
-    '  else {id: $e.id, action: "reject", msg: "blocked: this relay does not accept events from this pubkey"}',
+    '| if (.sourceType | IN("IP4", "IP6") | not) then {id: $e.id, action: "accept"}',
+    '  elif ($block[0][$e.pubkey] // false) then {id: $e.id, action: "reject", msg: "blocked: this pubkey may not publish to this relay"}',
+    `  elif ${allowed} then {id: $e.id, action: "accept"}`,
+    '  else {id: $e.id, action: "reject", msg: $msg}',
     '  end',
   ].join('\n')
-  return writeAtomic(
+  await writeAtomic('allowed.json', JSON.stringify(allow), 0o644)
+  await writeAtomic('blocked.json', JSON.stringify(block), 0o644)
+  // strfry restarts the plugin, which rereads both lists, when this file's mtime changes
+  await writeAtomic(
     'write-policy',
-    `#!/bin/sh\nexec jq -c --unbuffered --argjson allow '${allow}' '\n${program}\n'\n`,
+    `#!/bin/sh\nexec jq -c --unbuffered --slurpfile allow ${etcMount}/allowed.json --slurpfile block ${etcMount}/blocked.json --arg msg ${shellQuote(msg)} ${shellQuote(`\n${program}\n`)}\n`,
     0o755,
   )
 }
+
+let policyWrites = Promise.resolve()
+
+// the store and the sign-up state change independently, and both rewrite one file
+export const refreshPolicy = (signupUrl: string | null) =>
+  (policyWrites = policyWrites
+    .catch(() => {})
+    .then(async () => {
+      const store = await storeJson.read().once()
+      if (store)
+        await writePolicy(
+          store,
+          await signupState.read((s) => s.members).once(),
+          signupUrl,
+        )
+    }))
 
 export const countEvents = async (sub: StrfrySub, filter = '{}') =>
   Number(

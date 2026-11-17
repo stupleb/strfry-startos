@@ -83,7 +83,7 @@ export const relayInfo = sdk.Action.withInput(
     ),
     warning: null,
     allowedStatuses: 'any',
-    group: null,
+    group: i18n('Relay'),
     visibility: 'enabled',
   }),
 

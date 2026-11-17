@@ -27,6 +27,17 @@ export const inputSpec = InputSpec.of({
       { placeholder: 'npub1…', patterns: [keyPattern] },
     ),
   ),
+  blockedPubkeys: Value.list(
+    List.text(
+      {
+        name: i18n('Blocked Public Keys'),
+        description: i18n(
+          'Public keys whose events the relay never accepts from clients, whatever the mode, the list above or a payment',
+        ),
+      },
+      { placeholder: 'npub1…', patterns: [keyPattern] },
+    ),
+  ),
   acceptOldEvents: Value.toggle({
     name: i18n('Accept old events'),
     description: i18n(
@@ -44,11 +55,11 @@ export const writeAccess = sdk.Action.withInput(
   async ({ effects }) => ({
     name: i18n('Write Access'),
     description: i18n(
-      'Choose who can publish events to this relay. Changes to the list apply at once; changing the mode or the age limit restarts strfry.',
+      'Choose who can publish events to this relay. Public keys that paid through Paid Access can publish as well, unless blocked. Changes to the lists apply at once; changing the mode, the age limit, or whether any key is blocked restarts strfry.',
     ),
     warning: null,
     allowedStatuses: 'any',
-    group: null,
+    group: i18n('Relay'),
     visibility: 'enabled',
   }),
 
@@ -58,11 +69,14 @@ export const writeAccess = sdk.Action.withInput(
   // pre-fill
   async ({ effects }) =>
     storeJson
-      .read(({ writeMode, allowedPubkeys, acceptOldEvents }) => ({
-        writeMode,
-        allowedPubkeys,
-        acceptOldEvents,
-      }))
+      .read(
+        ({ writeMode, allowedPubkeys, blockedPubkeys, acceptOldEvents }) => ({
+          writeMode,
+          allowedPubkeys,
+          blockedPubkeys,
+          acceptOldEvents,
+        }),
+      )
       .once(),
 
   // execution
@@ -70,6 +84,7 @@ export const writeAccess = sdk.Action.withInput(
     storeJson.merge(effects, {
       writeMode: input.writeMode,
       allowedPubkeys: [...new Set(input.allowedPubkeys.map(toHexPubkey))],
+      blockedPubkeys: [...new Set(input.blockedPubkeys.map(toHexPubkey))],
       acceptOldEvents: input.acceptOldEvents,
     }),
 )

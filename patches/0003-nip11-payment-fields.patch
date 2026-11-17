@@ -1,0 +1,51 @@
+diff --git a/src/apps/relay/RelayWebsocket.cpp b/src/apps/relay/RelayWebsocket.cpp
+index 8cf7820..a65e564 100644
+--- a/src/apps/relay/RelayWebsocket.cpp
++++ b/src/apps/relay/RelayWebsocket.cpp
+@@ -105,6 +105,26 @@ void RelayServer::runWebsocket(ThreadPool<MsgWebsocket>::Thread &thr) {
+             if (cfg().relay__info__self.size()) nip11["self"] = maybeNpub(cfg().relay__info__self);
+             if (cfg().relay__info__privacy.size()) nip11["privacy_policy"] = cfg().relay__info__privacy;
+             if (cfg().relay__info__terms.size()) nip11["terms_of_service"] = cfg().relay__info__terms;
++            if (cfg().relay__info__paymentsUrl.size()) nip11["payments_url"] = cfg().relay__info__paymentsUrl;
++
++            {
++                bool restrictedWrites = cfg().relay__writePolicy__plugin.size() > 0;
++                const auto &param = cfg().relay__info__restrictedWrites;
++                if (param == "true") restrictedWrites = true;
++                else if (param == "false") restrictedWrites = false;
++                else if (param.size()) LE << "Unable to parse config param relay.info.restrictedWrites, using automatic value: expected \"true\", \"false\" or \"\"";
++                nip11["limitation"]["restricted_writes"] = restrictedWrites;
++            }
++
++            if (cfg().relay__info__fees.size()) {
++                try {
++                    auto fees = tao::json::from_string(cfg().relay__info__fees);
++                    if (!fees.is_object()) throw herr("not an object");
++                    nip11["fees"] = fees;
++                } catch (std::exception &e) {
++                    LE << "Unable to parse config param relay.info.fees, omitting fees: " << e.what();
++                }
++            }
+ 
+             rendered = preGenerateHttpResponse("application/json", tao::json::to_string(nip11));
+             ver = cfg().version();
+diff --git a/src/apps/relay/golpe.yaml b/src/apps/relay/golpe.yaml
+index 27caf17..b1091d1 100644
+--- a/src/apps/relay/golpe.yaml
++++ b/src/apps/relay/golpe.yaml
+@@ -52,6 +52,15 @@ config:
+   - name: relay__info__nips
+     desc: "List of supported lists as JSON array, or empty string to use default. Example: \"[1,2]\""
+     default: ""
++  - name: relay__info__paymentsUrl
++    desc: "NIP-11: URL where users can pay for access (payments_url)"
++    default: ""
++  - name: relay__info__fees
++    desc: "NIP-11: Fee schedule (fees) as a JSON object with optional admission, subscription and publication arrays, or empty string for none"
++    default: ""
++  - name: relay__info__restrictedWrites
++    desc: "NIP-11: Override limitation.restricted_writes: \"true\", \"false\", or empty string for automatic (true if relay.writePolicy.plugin is set)"
++    default: ""
+ 
+   - name: relay__maxWebsocketPayloadSize
+     desc: "Maximum accepted incoming websocket frame size (should be larger than max event)"
