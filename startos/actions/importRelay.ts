@@ -47,7 +47,7 @@ export const importRelay = sdk.Action.withInput(
     ),
     warning: null,
     allowedStatuses: 'any',
-    group: null,
+    group: i18n('Events'),
     visibility: 'enabled',
   }),
 
@@ -115,7 +115,7 @@ export const importRelay = sdk.Action.withInput(
         if (notice)
           throw new Error(
             i18n(
-              'The relay refused the sync: ${notice}. It may not support negentropy sync; Import Public Key works with any relay.',
+              'The relay refused the sync: ${notice}. It may not support negentropy sync; Import from Public Key works with any relay.',
               { notice },
             ),
           )

@@ -34,7 +34,7 @@ export const inputSpec = InputSpec.of({
   mentions: Value.toggle({
     name: i18n('Include mentions'),
     description: i18n(
-      "Also import other people's events that tag this public key, such as replies, reactions and direct messages",
+      "Also import other people's events that tag this public key, such as replies, reactions, direct messages and zaps it sent or received",
     ),
     default: false,
   }),
@@ -68,13 +68,13 @@ export const importPubkey = sdk.Action.withInput(
 
   // metadata
   async ({ effects }) => ({
-    name: i18n('Import Public Key'),
+    name: i18n('Import from Public Key'),
     description: i18n(
-      "Fetch one public key's events from another relay and store them here. Events already stored are skipped.",
+      "Fetch one public key's events from another relay and store them here, whether or not that key may publish here. Events already stored are skipped.",
     ),
     warning: null,
     allowedStatuses: 'any',
-    group: null,
+    group: i18n('Events'),
     visibility: 'enabled',
   }),
 
@@ -89,7 +89,9 @@ export const importPubkey = sdk.Action.withInput(
     const pubkey = toHexPubkey(input.pubkey)
     const filters = [
       { authors: [pubkey] },
-      ...(input.mentions ? [{ '#p': [pubkey] }] : []),
+      ...(input.mentions
+        ? [{ '#p': [pubkey] }, { kinds: [9735], '#P': [pubkey] }]
+        : []),
     ]
     const { fetched, skipped, added, total } = await withStrfry(
       effects,
@@ -155,7 +157,7 @@ export const importPubkey = sdk.Action.withInput(
     )
     return {
       version: '1',
-      title: i18n('Import Public Key'),
+      title: i18n('Import from Public Key'),
       message: [
         i18n(
           'Events fetched: ${fetched}. New events stored: ${added}. Events on the relay: ${total}.',

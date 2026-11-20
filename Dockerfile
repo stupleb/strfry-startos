@@ -32,6 +32,15 @@ RUN version="$(head -n1 CHANGES)" \
 RUN make -j"$(nproc)" \
     && strip strfry
 
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27-alpine AS signup
+
+ARG TARGETARCH
+WORKDIR /src
+COPY strfry-signup/go.mod strfry-signup/go.sum ./
+RUN go mod download
+COPY strfry-signup/ ./
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath -ldflags='-s -w' -o /strfry-signup .
+
 FROM docker.io/library/alpine:3.24
 
 RUN apk add --no-cache \
@@ -45,6 +54,7 @@ RUN apk add --no-cache \
     && adduser -D -H -u 1000 strfry
 
 COPY --from=build /build/strfry /usr/local/bin/strfry
+COPY --from=signup /strfry-signup /usr/local/bin/strfry-signup
 
 USER strfry
 ENTRYPOINT ["/usr/local/bin/strfry"]

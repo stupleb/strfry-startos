@@ -1,30 +1,56 @@
 import { relayUrl } from './actions/relayUrl'
+import { signupUrl } from './actions/signupUrl'
+import { signupState } from './fileModels/signupState.json'
 import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
+  backendHosts,
+  etcMount,
   mounts,
+  refreshPolicy,
   relay,
   relayPort,
+  signupAdminPort,
+  signupMounts,
+  signupPort,
   strfry,
   writeConfig,
-  writePolicy,
 } from './utils'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting strfry!'))
 
   const store = await storeJson
-    .read(({ allowedPubkeys, ...rest }) => rest)
+    .read((s) => ({
+      info: s.info,
+      writeMode: s.writeMode,
+      acceptOldEvents: s.acceptOldEvents,
+      payments: s.payments,
+      blocking: s.blockedPubkeys.length > 0,
+    }))
     .const(effects)
   if (!store) throw new Error(i18n('store.json is missing'))
 
-  await writeConfig(store, await relayUrl.bestUsable(effects).const())
+  const { payments } = store
+  const paid = payments.backend !== 'off'
+  const relayAddress = await relayUrl.bestUsable(effects).const()
+  const signupAddress = paid
+    ? await signupUrl.bestUsable(effects).const()
+    : null
 
-  storeJson.read().onChange(effects, async (s) => {
-    if (s) await writePolicy(s)
+  await writeConfig(store, relayAddress, signupAddress)
+
+  storeJson.read().onChange(effects, async () => {
+    await refreshPolicy(signupAddress)
     return { cancel: false }
   })
+  signupState
+    .read((s) => s.members)
+    .onChange(effects, async () => {
+      await refreshPolicy(signupAddress)
+      return { cancel: false }
+    })
 
   const subcontainer = sdk.SubContainer.of(
     effects,
@@ -37,7 +63,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     if (relay.sub === subcontainer) relay.sub = undefined
   })
 
-  return sdk.Daemons.of(effects).addDaemon('primary', {
+  const daemons = sdk.Daemons.of(effects).addDaemon('primary', {
     subcontainer,
     exec: {
       command: [
@@ -56,4 +82,82 @@ export const main = sdk.setupMain(async ({ effects }) => {
     },
     requires: [],
   })
+
+  if (payments.backend === 'off') return daemons
+
+  const backendUrl =
+    payments.url ||
+    (await sdk.host
+      .getBridgeAddress(effects, {
+        ...backendHosts[payments.backend],
+        ssl: false,
+      })
+      .const()
+      .then((addr) => (addr ? `http://${addr}` : '')))
+
+  return daemons
+    .addDaemon('signup', {
+      subcontainer: sdk.SubContainer.of(
+        effects,
+        { imageId: 'strfry' },
+        signupMounts,
+        'signup-sub',
+      ),
+      exec: {
+        command: ['strfry-signup'],
+        env: {
+          SIGNUP_LISTEN: `:${signupPort}`,
+          SIGNUP_ADMIN_LISTEN: `127.0.0.1:${signupAdminPort}`,
+          SIGNUP_BLOCKED_FILE: `${etcMount}/blocked.json`,
+          SIGNUP_DATA: '/var/lib/signup',
+          SIGNUP_ACCEPTING: String(store.writeMode !== 'open'),
+          SIGNUP_PRICE_SATS: String(payments.priceSats),
+          SIGNUP_PERIOD_DAYS: String(payments.periodDays),
+          SIGNUP_BACKEND: payments.backend,
+          SIGNUP_BACKEND_URL: backendUrl,
+          SIGNUP_ROOT_CA: payments.rootCa,
+          SIGNUP_LNBITS_KEY: payments.lnbitsKey,
+          SIGNUP_BTCPAY_STORE: payments.btcpayStoreId,
+          SIGNUP_BTCPAY_KEY: payments.btcpayKey,
+          RELAY_NAME: store.info.name,
+          RELAY_DESCRIPTION: store.info.description,
+          RELAY_ICON: store.info.icon,
+          RELAY_URL: relayAddress ?? '',
+          RELAY_TERMS: store.info.terms,
+          RELAY_PRIVACY: store.info.privacy,
+          RELAY_CONTACT: store.info.contact,
+        },
+      },
+      ready: {
+        display: i18n('Sign-up Page'),
+        fn: () =>
+          sdk.healthCheck.checkPortListening(effects, signupPort, {
+            successMessage: i18n('The sign-up page is up'),
+            errorMessage: i18n('The sign-up page is not responding'),
+          }),
+      },
+      requires: [],
+    })
+    .addHealthCheck('payments', {
+      ready: {
+        display: i18n('Payments'),
+        fn: async () => {
+          const res = await fetch(`http://127.0.0.1:${signupPort}/healthz`, {
+            signal: AbortSignal.timeout(20_000),
+          }).catch(() => null)
+          if (res?.ok)
+            return {
+              result: 'success',
+              message: i18n('The payment backend accepts the credentials'),
+            }
+          const error =
+            (await res?.json().catch(() => null))?.error ?? 'no response'
+          return {
+            result: 'failure',
+            message: i18n('Payments are unavailable: ${error}', { error }),
+          }
+        },
+      },
+      requires: ['signup'],
+    })
 })

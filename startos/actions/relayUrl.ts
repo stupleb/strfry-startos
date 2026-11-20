@@ -13,7 +13,7 @@ export const relayUrl = sdk.setupPrimaryUrl({
     ),
     warning: null,
     allowedStatuses: 'any',
-    group: null,
+    group: i18n('Relay'),
     visibility: 'enabled',
   },
   field: { name: i18n('Relay URL'), description: null },

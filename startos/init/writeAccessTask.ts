@@ -5,7 +5,12 @@ import { sdk } from '../sdk'
 
 export const writeAccessTask = sdk.setupOnInit(async (effects) => {
   const nobodyCanWrite = await storeJson
-    .read((s) => s.writeMode !== 'open' && !s.allowedPubkeys.length)
+    .read(
+      (s) =>
+        s.writeMode !== 'open' &&
+        !s.allowedPubkeys.length &&
+        s.payments.backend === 'off',
+    )
     .const(effects)
 
   if (nobodyCanWrite) {
