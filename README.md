@@ -35,13 +35,13 @@
 
 The package builds its own image from strfry's source.
 
-| Item          | Value                                                                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Image         | Built by the package's `Dockerfile` on Alpine from the `strfry` git submodule (an upstream release tag), with the upstream fixes in `patches/` applied |
-| Architectures | x86_64, aarch64                                                                                                                                        |
-| User          | `strfry` (uid 1000)                                                                                                                                    |
-| Command       | `strfry --config=/etc/strfry/strfry.conf relay`, after raising the open-file limit to the container's hard limit                                       |
-| Extra tools   | `jq`, which runs the write policy; `strfry-signup`, the package's own sign-up service, built from the `strfry-signup/` submodule                       |
+| Item          | Value                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Image         | Built by the package's `Dockerfile` on Alpine from the `strfry` git submodule (an upstream release tag), with the carried patches in `patches/` applied |
+| Architectures | x86_64, aarch64                                                                                                                                         |
+| User          | `strfry` (uid 1000)                                                                                                                                     |
+| Command       | `strfry --config=/etc/strfry/strfry.conf relay`, after raising the open-file limit to the container's hard limit                                        |
+| Extra tools   | `jq`, which runs the write policy; `strfry-signup`, the package's own sign-up service, built from the `strfry-signup/` submodule                        |
 
 Subcontainers: `strfry-sub` runs the relay, and `signup-sub` runs `strfry-signup` while **Paid Access** is on. The import and delete actions run their `strfry` commands inside `strfry-sub` while the relay runs, and in a short-lived subcontainer named after the action (`import-relay`, `import-pubkey`, `delete-events`) while it is stopped. LMDB tells its processes apart by PID, so a second subcontainer, with its own PID namespace, cannot open the database while the relay has it open.
 
@@ -61,26 +61,26 @@ The LMDB map size is the upstream default on x86_64 and 256 GiB on aarch64, beca
 
 `store.json` is the only file the user's choices live in; the package regenerates strfry's own files from it.
 
-- **`store.json`** (JSON, volume `startos`): the relay and sign-up URL choices, the NIP-11 info, the write mode, the allowed and blocked pubkeys (hex), the old-events toggle, and `payments`: the backend (`off`, `lnbits`, `btcpay`), its address (empty for the one on this server) and Root CA, its credentials, the price in sats and the days one payment buys (0: permanent). Seeded with defaults at install and merged on every init; written only by actions. A hand edit to a field survives, but a malformed `allowedPubkeys` or `blockedPubkeys` entry empties that whole list.
+- **`store.json`** (JSON, volume `startos`): the relay URL choice, the NIP-11 info, the write mode, the allowed and blocked pubkeys (hex), the old-events toggle, and `payments`: the backend (`off`, `lnbits`, `btcpay`), its address (empty for the one on this server) and Root CA, its credentials, the price in sats and the days one payment buys (0: permanent). Seeded with defaults at install and merged on every init; written only by actions. A hand edit to a field survives, but a malformed `allowedPubkeys` or `blockedPubkeys` entry empties that whole list.
 - **`signup/state.json`** (JSON, volume `startos`): written only by `strfry-signup`, atomically. `members` maps a hex pubkey to `until` (Unix seconds, or `null` for permanent) and `since`; `invoices` holds each invoice's pubkey, payment details and status, dropped a day after it expired or was paid. The operator's edits reach it through `strfry-signup`'s admin API. The package reads `members` only; a malformed entry drops every member from the write policy rather than letting anyone in.
-- **`etc/strfry.conf`** (JSON, which strfry's config format accepts): rewritten in full on every init and every start. Database path, map size, bind address, port, `nofiles = 0`, `realIpHeader = x-forwarded-for`, NIP-42 `serviceUrl`, NIP-11 info, write-policy path and event age limit are set from `store.json` and the relay URL. NIP-11 also carries `limitation.restricted_writes`, false only in open mode, and, while access is for sale, `payments_url` (the sign-up URL) and `fees` (a `subscription`, or an `admission` for permanent access, in msats); these three keys come from carried patch 0003. Every other key is strfry's compiled-in default. A hand edit is lost at the next start.
+- **`etc/strfry.conf`** (JSON, which strfry's config format accepts): rewritten in full on every init and every start. Database path, map size, bind address and port (`0.0.0.0:7777`, or `127.0.0.1:7778` while Paid Access is on), `nofiles = 0`, `realIpHeader = x-forwarded-for`, NIP-42 `serviceUrl`, NIP-11 info, write-policy path and event age limit are set from `store.json` and the relay URL. NIP-11 also carries `limitation.restricted_writes`, false only in open mode, and, while access is for sale, `payments_url` (`/join` on the relay URL, over `https`, or `http` for a `ws://` URL) and `fees` (a `subscription`, or an `admission` for permanent access, in msats); these three keys come from carried patch 0003. Every other key is strfry's compiled-in default. A hand edit is lost at the next start.
 - **`etc/write-policy`** (shell script): runs a `jq` filter that loads `allowed.json` and `blocked.json` at start. Rewritten, after both lists, whenever `store.json` or `signup/state.json` changes, while the relay runs; strfry restarts a plugin whose file modification time changes, so a new list applies to the next event without restarting strfry.
 - **`etc/allowed.json`** (JSON object): `listed`, the Write Access list, and `paid`, the paid members whose access has not run out, each keyed by hex pubkey (`true`, or a paid member's `until`).
 - **`etc/blocked.json`** (JSON object keyed by hex pubkey): the blocked list. `strfry-signup` rereads it at most every 2 seconds and sells nothing to those keys.
 
-The write policy accepts every event the import actions write (`sourceType` `Sync`, `Import`). An event from a client (`IP4`/`IP6`) is refused if its author is blocked; otherwise it is accepted in open mode, or when its author is listed or a paid member whose `until` is in the future (compared with `jq`'s `now`, so expiry needs no rewrite), or, in inbox mode, when any `p` tag names a listed pubkey. A paid member can publish but is not an inbox: an event tagging one is held to the same test as any other. A refusal while access is for sale says `restricted: pay for write access at <sign-up URL>`. With open mode and no blocked keys, strfry runs no plugin.
+The write policy accepts every event the import actions write (`sourceType` `Sync`, `Import`). An event from a client (`IP4`/`IP6`) is refused if its author is blocked; otherwise it is accepted in open mode, or when its author is listed or a paid member whose `until` is in the future (compared with `jq`'s `now`, so expiry needs no rewrite), or, in inbox mode, when any `p` tag names a listed pubkey. A paid member can publish but is not an inbox: an event tagging one is held to the same test as any other. A refusal while access is for sale says `restricted: pay for write access at <relay URL>/join`, over `https`. With open mode and no blocked keys, strfry runs no plugin.
 
 ## Dependencies
 
-Optional, and only one at a time: **LNbits** or **BTCPay Server**, required running while **Paid Access** uses that backend on **This server**. The package reaches it on its bridge address (host `main`, internal port 5000 or 23000). A backend elsewhere, given by URL, is no dependency.
+Optional, and only one at a time: **LNbits** or **BTCPay Server**, required running, with its `primary` (LNbits) or `btcpay` (BTCPay Server) health check passing, while **Paid Access** uses that backend on **This server**. The package reaches it on its bridge address (host `main`, internal port 5000 or 23000). A backend elsewhere, given by URL, is no dependency.
 
 ## Network Access and Interfaces
 
-One interface, `relay` (`api`), bound to port 7777 with the `ws` protocol: StartOS terminates TLS and proxies plain HTTP and websocket to strfry. The same port serves the NIP-11 document (`Accept: application/nostr+json`), strfry's HTML landing page, and `/metrics` (Prometheus text), which strfry cannot turn off.
+One interface, `relay` (`api`), bound to port 7777 with the `ws` protocol: StartOS terminates TLS and proxies plain HTTP and websocket to it. The same port serves the NIP-11 document (`Accept: application/nostr+json`), strfry's HTML landing page, and `/metrics` (Prometheus text), which strfry cannot turn off.
 
-strfry reads the client address from the `X-Forwarded-For` header StartOS adds, so logs and the write policy see the real client IP.
+While **Paid Access** is on, `strfry-signup` answers on port 7777 and strfry moves to `127.0.0.1:7778`, reachable only through it. `strfry-signup` serves the sign-up page and its API under `/join/`, redirects a browser's `GET /` there, and hands every other request to strfry unchanged: websockets, NIP-11, `/metrics` and any other path. The sign-up page needs no interface or domain of its own.
 
-A second interface, `signup` (`ui`), exists only while **Paid Access** is on: port 8080, `http`, the sign-up page. Turning Paid Access off removes the interface; StartOS keeps its binding, so a domain the user attached comes back with it.
+strfry reads the client address from the `X-Forwarded-For` header StartOS adds, which `strfry-signup` passes on untouched, so logs and the write policy see the real client IP.
 
 The import actions open outbound websocket connections from the server to the relay the user names, and the Paid Access action and `strfry-signup` open HTTP(S) connections to the payment backend.
 
@@ -92,13 +92,13 @@ The relay URL defaults to the interface's preferred address (a public domain, el
 
 ## Sign-up Service
 
-`strfry-signup` (Go, the `strfry-signup/` submodule; [stupleb/strfry-signup](https://github.com/stupleb/strfry-signup) documents the program in full) serves the page and a small JSON API on port 8080. Its settings, payment credentials included, arrive as environment variables (`SIGNUP_*`, `RELAY_*`) set from `store.json` and the relay URL at each start, so **Configure Paid Access**, **Relay Info** and **Write Access** mode changes restart it.
+`strfry-signup` (Go, the `strfry-signup/` submodule; [stupleb/strfry-signup](https://github.com/stupleb/strfry-signup) documents the program in full) serves the page and a small JSON API under `/join/` on port 7777, in front of strfry (see Network Access and Interfaces). Its settings, payment credentials included, arrive as environment variables (`SIGNUP_*`, `RELAY_*`) set from `store.json` and the relay URL at each start, so **Configure Paid Access**, **Relay Info** and **Write Access** mode changes restart it.
 
-- `GET /`: the page, an HTML template with the relay's name, description, icon, URL, terms, privacy link, contact and price. `app.js` and `app.css` are served beside it; the content security policy allows only same-origin scripts, styles and requests, plus `https:` and `data:` images.
-- `GET /api/member/{npub or hex}`: whether the key is a member, until when, whether it is blocked, and its npub.
-- `POST /api/invoice` `{"pubkey"}`: an invoice for the price, with QR codes as `data:` PNGs. A key with an unpaid invoice that has over two minutes left gets that invoice again. Limits: 10 requests per client per 10 minutes (the last `X-Forwarded-For` entry, an IPv6 address counted by its /64), repeats for an open invoice included; 100 unexpired unpaid invoices in all, counting those still being created; none for a key that already has permanent access or is blocked.
-- `POST /api/invoice/{id}/onchain`: BTCPay only. Activates the invoice's on-chain payment method, deriving its address, the first time the visitor opens the **On-chain** tab.
-- `GET /api/invoice/{id}`: the invoice's status: `pending`, `processing` (BTCPay has seen an on-chain payment), `paid` (with `until`) or `expired`.
+- `GET /join/`: the page, an HTML template with the relay's name, description, icon, URL, terms, privacy link, contact and price. `app.js` and `app.css` are served beside it; the content security policy allows only same-origin scripts, styles and requests, plus `https:` and `data:` images.
+- `GET /join/api/member/{npub or hex}`: whether the key is a member, until when, whether it is blocked, and its npub.
+- `POST /join/api/invoice` `{"pubkey"}`: an invoice for the price, with QR codes as `data:` PNGs. A key with an unpaid invoice that has over two minutes left gets that invoice again. Limits: 10 requests per client per 10 minutes (the last `X-Forwarded-For` entry, an IPv6 address counted by its /64), repeats for an open invoice included; 100 unexpired unpaid invoices in all, counting those still being created; none for a key that already has permanent access or is blocked.
+- `POST /join/api/invoice/{id}/onchain`: BTCPay only. Activates the invoice's on-chain payment method, deriving its address, the first time the visitor opens the **On-chain** tab.
+- `GET /join/api/invoice/{id}`: the invoice's status: `pending`, `processing` (BTCPay has seen an on-chain payment), `paid` (with `until`) or `expired`.
 - `GET /healthz`: answered only to direct loopback requests; checks the backend credentials, cached for 30 seconds.
 
 A second listener on `127.0.0.1:8081`, which no interface binds, takes the operator's edits from **Edit Paid Member**: `PUT /member/{hex}` `{"until": <Unix seconds or null>}` sets a key's access, adding it if it has never paid, and `DELETE /member/{hex}` removes it, answering 404 for a key that is not a member.
@@ -113,15 +113,14 @@ The page takes no payment while the write mode is open, and shows that payments 
 
 ## Actions
 
-StartOS shows them in three sections: **Relay** for the first three, **Paid Access** for the next four and **Events** for the rest.
+StartOS shows them in three sections: **Relay** for the first three, **Paid Access** for the next three and **Events** for the rest.
 
 - **Write Access** — choose open, whitelist or inbox mode, edit the pubkey list and the blocked list (npub or hex, stored as hex), and allow events up to 20 years old instead of 3. A list change applies to the next event; a mode or age change, or the blocked list going from empty to not or back, restarts strfry. Safe to repeat.
 - **Relay Info** — the NIP-11 fields clients display. The admin pubkey is stored as hex. Restarts strfry. Safe to repeat.
-- **Set Relay URL** — picks the address written to strfry's NIP-42 `serviceUrl`. Restarts strfry. Safe to repeat.
-- **Configure Paid Access** — off, LNbits or BTCPay Server, with where the backend runs (this server, or another server's address with an optional Root CA for a certificate that isn't public; a `.local` address is refused, since `.local` names do not resolve inside service containers), the credentials (for LNbits, the Invoice/Read key of the one wallet credited with every payment; for BTCPay, a store ID and API key), the price in sats and the access one payment buys (30, 90 or 365 days, or permanent). Before saving it checks the credentials against the backend: an LNbits key must open the wallet and be refused an outgoing payment (an Admin key is rejected), and a BTCPay key must hold `btcpay.store.cancreateinvoice` and `btcpay.store.canviewinvoices`, each scoped to that store (an unscoped, all-store key is refused), and nothing else (the `btcpay.server.*lightninginvoiceinternalnode` pair is refused), and must be able to list the store's invoices. On saving, the result names where payments go: the LNbits wallet's name, which LNbits returns to an invoice key, or the BTCPay store ID. Off clears the stored credentials. Restarts strfry and the sign-up service. Safe to repeat.
-- **Set Sign-up URL** — picks the sign-up page address used in the refusal message and NIP-11 `payments_url`; without a choice, the preferred address (a public domain, HTTPS first). Hidden while Paid Access is off. Restarts strfry.
-- **Paid Members** — lists members, newest first, as npubs with their expiry, or Blocked for a key in Blocked Public Keys. Read-only. Hidden while Paid Access is off.
-- **Edit Paid Member** — for one pubkey (npub or hex): set its expiry to the end of a chosen day (UTC) or make it permanent, which adds a key that has never paid, remove the membership, or ban it (remove, then add it to Blocked Public Keys, which restarts strfry if that list was empty). Ban also takes a key that is not a member. Runs only while the service is running; hidden while Paid Access is off. An invoice the key had open and pays after a removal credits it again.
+- **Set Relay URL** — picks the address written to strfry's NIP-42 `serviceUrl`, which, with `/join` added, is also the sign-up page address in the refusal message and NIP-11 `payments_url`. Restarts strfry. Safe to repeat.
+- **Configure Paid Access** — sets the backend, where it runs, its credentials, the price and the access one payment buys. LNbits credits every payment to the one wallet whose key is given. A `.local` backend address is refused, since `.local` names do not resolve inside service containers. Before saving it checks the credentials against the backend: an LNbits key must open the wallet and be refused an outgoing payment (an Admin key is rejected), and a BTCPay key must hold `btcpay.store.cancreateinvoice` and `btcpay.store.canviewinvoices`, each scoped to that store (an unscoped, all-store key is refused), and nothing else (the `btcpay.server.*lightninginvoiceinternalnode` pair is refused), and must be able to list the store's invoices. On saving, the result names where payments go: the LNbits wallet's name, which LNbits returns to an invoice key, or the BTCPay store ID. Off clears the stored credentials. Restarts strfry and the sign-up service. Safe to repeat.
+- **Paid Members** — lists members, newest first, as npubs with their expiry, or Blocked for a key in Blocked Public Keys. Read-only.
+- **Edit Paid Member** — for one pubkey (npub or hex): set its expiry to the end of a chosen day (UTC) or make it permanent, which adds a key that has never paid, remove the membership, or ban it (remove, then add it to Blocked Public Keys, which restarts strfry if that list was empty). Ban also takes a key that is not a member. An invoice the key had open and pays after a removal credits it again.
 - **Import from Public Key** — fetches one pubkey's events (and, optionally, events tagging it in a `p` tag and zap receipts naming it in a `P` tag, which between them cover the zaps it received and sent; a sent zap is found only where the recipient's zap server added the `P` tag) from any relay with plain `REQ`s, 500 at a time going back in time, then writes them with `strfry import`, which skips the write policy and the age limit. Events of 64 KiB or more (the relay's own size limit), such as notes tagging thousands of pubkeys, are left out and counted in the result. Its duration depends on the remote relay; each page waits at most two minutes. A remote that caps or truncates history returns fewer events than exist. Safe to repeat: stored events are skipped.
 - **Import from Relay** — `strfry sync --dir=down` (negentropy) against a relay that supports it, optionally with a filter. Ignores the age limit for the events it copies. Stops when the remote answers with a NOTICE, after three minutes without progress, or after an hour; a repeat run resumes, since negentropy transfers only what is missing. Most public relays refuse it, strfry ones included ("negentropy disabled"); it is for relays the user runs or that advertise negentropy.
 - **Delete Events** — `strfry delete` by author (npub or hex) and/or event ID (`note1`, `nevent1` or hex). Preview (on by default) only counts. Destructive and immediate; an author still allowed by Write Access can publish the events again.
@@ -137,9 +136,11 @@ Two tasks, both `important`, neither blocking startup.
 
 ## Health Checks
 
-**Relay** passes once strfry listens on port 7777. While Paid Access is on, **Sign-up Page** passes once `strfry-signup` listens on port 8080, and **Payments** passes while the backend accepts the credentials (`/healthz`); its failure message carries the backend's answer, or "no payment backend address" when a local backend is not installed. For the first 10 seconds after a start, a failure shows as starting.
+**Relay** passes once strfry listens on port 7777, or 7778 while Paid Access is on. Then **Sign-up Page** passes once `strfry-signup` listens on port 7777, and **Payments** passes while the backend accepts the credentials (`/healthz`); its failure message carries the backend's answer, or "no payment backend address" when a local backend is not installed. For the first 10 seconds after a start, a failure shows as starting.
 
-A failure after that means strfry exited: its log shows why. Typical causes are a database whose version this strfry refuses ("Database version too old/too new"), an LMDB map that cannot be allocated, or a disk that is full.
+A **Relay** failure after that means strfry exited: its log shows why. Typical causes are a database whose version this strfry refuses ("Database version too old/too new"), an LMDB map that cannot be allocated, or a disk that is full.
+
+While Paid Access is on, strfry listens only behind `strfry-signup`, so a failing **Sign-up Page** check means no client can reach the relay either; the service log shows why `strfry-signup` stopped. A failing **Payments** check stops new sign-ups and leaves the relay and existing members working: start the backend, or run **Configure Paid Access** again if the backend refuses the credentials. It checks every 30 seconds, so it can show starting for about half a minute after a start, and turns green within half a minute of a fix.
 
 ## Backups and Restore
 
@@ -147,15 +148,16 @@ Both volumes are copied whole (`ofVolumes('startos', 'main')`) with strfry stopp
 
 ## Limitations and Differences
 
-1. Reads are never restricted: anyone who can reach the relay can read every stored event, whatever the write mode.
-2. NIP-42 AUTH succeeds only on the chosen relay URL's host and port; a client on another address (`.onion`, `.local`) cannot authenticate, so it cannot publish protected (NIP-70) events.
-3. The import actions reach relays on the clearnet only; `.onion` relays are not reachable.
-4. The write policy matches pubkeys only; it has no rate limiting or content filtering.
-5. Every strfry setting not listed under File Models stays at its compiled-in default, and the `strfry router` mirroring daemon is not run.
-6. On aarch64 the database cannot grow past 256 GiB.
-7. Prices are in sats only, and there are no refunds or partial payments: an underpaid or late BTCPay invoice is left to the operator, who can settle it in BTCPay and then grant the key with **Edit Paid Member**.
-8. BTCPay's `Settled` counts as paid, so the store's payment tolerance and its speed policy decide whether an underpaid or unconfirmed on-chain payment buys access.
-9. Paid members are tracked by the package, not by LNbits or BTCPay Server: restoring the backend alone does not restore memberships.
+What the relay and its sign-up page do not do, and where they differ from a stock strfry.
+
+1. NIP-42 AUTH succeeds only on the chosen relay URL's host and port; a client on another address (`.onion`, `.local`) cannot authenticate, so it cannot publish protected (NIP-70) events.
+2. The import actions reach relays on the clearnet only; `.onion` relays are not reachable.
+3. The write policy matches pubkeys only; it has no rate limiting or content filtering.
+4. Every strfry setting not listed under File Models stays at its compiled-in default, and the `strfry router` mirroring daemon is not run.
+5. On aarch64 the database cannot grow past 256 GiB.
+6. Prices are in sats only, and there are no refunds or partial payments: an underpaid or late BTCPay invoice is left to the operator, who can settle it in BTCPay and then grant the key with **Edit Paid Member**.
+7. A BTCPay invoice buys access once BTCPay marks it `Settled`.
+8. Paid members are tracked by the package, not by LNbits or BTCPay Server: restoring the backend alone does not restore memberships.
 
 ---
 
@@ -183,13 +185,11 @@ startos_managed_env_vars:
 dependencies: [lnbits (optional), btcpayserver (optional)]
 interfaces:
   relay: { type: api, port: 7777 }
-  signup: { type: ui, port: 8080, only while Paid Access is on }
 actions:
   - write-access
   - relay-info
   - set-relay-url
   - paid-access
-  - set-signup-url
   - paid-members
   - edit-paid-member
   - import-pubkey

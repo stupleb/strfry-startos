@@ -1,5 +1,4 @@
 import { relayUrl } from './actions/relayUrl'
-import { signupUrl } from './actions/signupUrl'
 import { signupState } from './fileModels/signupState.json'
 import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
@@ -13,8 +12,8 @@ import {
   relayPort,
   signupAdminPort,
   signupMounts,
-  signupPort,
   strfry,
+  strfryPort,
   writeConfig,
 } from './utils'
 
@@ -35,20 +34,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const { payments } = store
   const paid = payments.backend !== 'off'
   const relayAddress = await relayUrl.bestUsable(effects).const()
-  const signupAddress = paid
-    ? await signupUrl.bestUsable(effects).const()
-    : null
 
-  await writeConfig(store, relayAddress, signupAddress)
+  await writeConfig(store, relayAddress)
 
   storeJson.read().onChange(effects, async () => {
-    await refreshPolicy(signupAddress)
+    await refreshPolicy(relayAddress)
     return { cancel: false }
   })
   signupState
     .read((s) => s.members)
     .onChange(effects, async () => {
-      await refreshPolicy(signupAddress)
+      await refreshPolicy(relayAddress)
       return { cancel: false }
     })
 
@@ -75,10 +71,14 @@ export const main = sdk.setupMain(async ({ effects }) => {
     ready: {
       display: i18n('Relay'),
       fn: () =>
-        sdk.healthCheck.checkPortListening(effects, relayPort, {
-          successMessage: i18n('The relay is accepting connections'),
-          errorMessage: i18n('The relay is not accepting connections'),
-        }),
+        sdk.healthCheck.checkPortListening(
+          effects,
+          paid ? strfryPort : relayPort,
+          {
+            successMessage: i18n('The relay is accepting connections'),
+            errorMessage: i18n('The relay is not accepting connections'),
+          },
+        ),
     },
     requires: [],
   })
@@ -106,7 +106,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
       exec: {
         command: ['strfry-signup'],
         env: {
-          SIGNUP_LISTEN: `:${signupPort}`,
+          SIGNUP_LISTEN: `:${relayPort}`,
+          SIGNUP_RELAY_UPSTREAM: `http://127.0.0.1:${strfryPort}`,
           SIGNUP_ADMIN_LISTEN: `127.0.0.1:${signupAdminPort}`,
           SIGNUP_BLOCKED_FILE: `${etcMount}/blocked.json`,
           SIGNUP_DATA: '/var/lib/signup',
@@ -131,18 +132,21 @@ export const main = sdk.setupMain(async ({ effects }) => {
       ready: {
         display: i18n('Sign-up Page'),
         fn: () =>
-          sdk.healthCheck.checkPortListening(effects, signupPort, {
+          sdk.healthCheck.checkPortListening(effects, relayPort, {
             successMessage: i18n('The sign-up page is up'),
-            errorMessage: i18n('The sign-up page is not responding'),
+            errorMessage: i18n(
+              'The sign-up page is not responding, so clients cannot reach the relay either',
+            ),
           }),
       },
-      requires: [],
+      requires: ['primary'],
     })
     .addHealthCheck('payments', {
       ready: {
         display: i18n('Payments'),
+        trigger: sdk.trigger.statusTrigger(30_000, { starting: 5_000 }),
         fn: async () => {
-          const res = await fetch(`http://127.0.0.1:${signupPort}/healthz`, {
+          const res = await fetch(`http://127.0.0.1:${relayPort}/healthz`, {
             signal: AbortSignal.timeout(20_000),
           }).catch(() => null)
           if (res?.ok)
@@ -150,11 +154,14 @@ export const main = sdk.setupMain(async ({ effects }) => {
               result: 'success',
               message: i18n('The payment backend accepts the credentials'),
             }
-          const error =
-            (await res?.json().catch(() => null))?.error ?? 'no response'
+          const error = (await res?.json().catch(() => null))?.error
           return {
             result: 'failure',
-            message: i18n('Payments are unavailable: ${error}', { error }),
+            message: error
+              ? i18n('Payments are unavailable: ${error}', { error })
+              : i18n(
+                  'Payments are unavailable: the sign-up page did not answer',
+                ),
           }
         },
       },

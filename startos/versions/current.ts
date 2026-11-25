@@ -1,21 +1,24 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
+import { sdk } from '../sdk'
 
 export const current = VersionInfo.of({
-  version: '1.1.3:1',
+  version: '1.1.3:2',
   releaseNotes: {
     en_US:
-      'Paid Access sells write access through a public sign-up page, paid with LNbits or BTCPay Server. Write Access can also block public keys outright. With Include mentions on, Import from Public Key also brings in the zaps a key sent.',
+      "While Paid Access is on, the sign-up page is at /join on the relay's own address, and the relay's address opened in a browser goes there. The Sign-up Page interface is removed, along with any domain added to it: add that domain to the Relay interface to keep its links working.",
     es_ES:
-      'Acceso de pago vende el acceso de escritura mediante una página de registro pública, que se paga con LNbits o BTCPay Server. Acceso de escritura también puede bloquear claves públicas por completo. Con Incluir menciones activado, Importar desde clave pública también trae los zaps que envió una clave.',
+      'Con Acceso de pago activado, la página de registro está en /join en la propia dirección del relay, y la dirección del relay abierta en un navegador lleva a ella. La interfaz Página de registro se elimina, junto con cualquier dominio añadido a ella: añade ese dominio a la interfaz Relay para que sus enlaces sigan funcionando.',
     de_DE:
-      'Bezahlter Zugang verkauft Schreibzugriff über eine öffentliche Anmeldeseite, bezahlt mit LNbits oder BTCPay Server. Schreibzugriff kann öffentliche Schlüssel außerdem vollständig sperren. Mit Erwähnungen einbeziehen holt Von öffentlichem Schlüssel importieren auch die Zaps, die ein Schlüssel gesendet hat.',
+      'Ist Bezahlter Zugang aktiv, liegt die Anmeldeseite unter /join auf der Adresse des Relays selbst, und die Relay-Adresse führt im Browser dorthin. Die Schnittstelle Anmeldeseite entfällt, samt jeder ihr hinzugefügten Domain: Füge diese Domain der Schnittstelle Relay hinzu, damit ihre Links weiter funktionieren.',
     pl_PL:
-      'Płatny dostęp sprzedaje dostęp do zapisu przez publiczną stronę rejestracji opłacaną przez LNbits lub BTCPay Server. Dostęp do zapisu może też całkowicie blokować klucze publiczne. Przy włączonym Uwzględnij wzmianki Importuj z klucza publicznego pobiera też zapy wysłane przez klucz.',
+      'Gdy Płatny dostęp jest włączony, strona rejestracji jest pod /join na adresie samego przekaźnika, a adres przekaźnika otwarty w przeglądarce prowadzi do niej. Interfejs Strona rejestracji zostaje usunięty wraz z każdą dodaną do niego domeną: dodaj tę domenę do interfejsu Przekaźnik, aby jej linki nadal działały.',
     fr_FR:
-      "Accès payant vend l'accès en écriture via une page d'inscription publique, payée avec LNbits ou BTCPay Server. Accès en écriture peut aussi bloquer complètement des clés publiques. Avec Inclure les mentions, Importer depuis une clé publique récupère aussi les zaps qu'une clé a envoyés.",
+      "Quand Accès payant est activé, la page d'inscription se trouve à /join sur l'adresse même du relais, et l'adresse du relais ouverte dans un navigateur y mène. L'interface Page d'inscription est supprimée, avec tout domaine qui lui a été ajouté : ajoutez ce domaine à l'interface Relais pour que ses liens continuent de fonctionner.",
   },
   migrations: {
-    up: async ({ effects }) => {},
+    up: async ({ effects }) => {
+      await sdk.MultiHost.of(effects, 'signup-multi').retire()
+    },
     down: IMPOSSIBLE,
   },
 })

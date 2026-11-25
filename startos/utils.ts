@@ -7,7 +7,8 @@ import type { manifest } from './manifest'
 import { sdk } from './sdk'
 
 export const relayPort = 7777
-export const signupPort = 8080
+// strfry's own port while the sign-up service answers on relayPort in front of it
+export const strfryPort = 7778
 export const signupAdminPort = 8081
 export const appUid = 1000
 
@@ -208,8 +209,21 @@ const writeAtomic = async (name: string, data: string, mode: number) => {
   await rename(`${etcDir}/.${name}.tmp`, `${etcDir}/${name}`)
 }
 
+const fronted = (store: Pick<Store, 'payments'>) =>
+  store.payments.backend !== 'off'
+
 const sellsAccess = (store: Pick<Store, 'payments' | 'writeMode'>) =>
-  store.payments.backend !== 'off' && store.writeMode !== 'open'
+  fronted(store) && store.writeMode !== 'open'
+
+export const joinUrl = (relayUrl: string | null) => {
+  if (!relayUrl) return null
+  const url = new URL(relayUrl)
+  url.protocol = url.protocol === 'ws:' ? 'http:' : 'https:'
+  url.pathname = '/join'
+  url.search = ''
+  url.hash = ''
+  return url.href
+}
 
 const fees = ({ priceSats, periodDays }: Store['payments']) =>
   periodDays
@@ -229,7 +243,6 @@ export const writeConfig = (
     blocking: boolean
   },
   relayUrl: string | null,
-  signupUrl: string | null,
 ) =>
   writeAtomic(
     'strfry.conf',
@@ -247,15 +260,15 @@ export const writeConfig = (
             : threeYears,
         },
         relay: {
-          bind: '0.0.0.0',
-          port: relayPort,
+          bind: fronted(store) ? '127.0.0.1' : '0.0.0.0',
+          port: fronted(store) ? strfryPort : relayPort,
           nofiles: 0,
           realIpHeader: 'x-forwarded-for',
           auth: { enabled: true, serviceUrl: relayUrl ?? '' },
           info: {
             ...store.info,
             restrictedWrites: store.writeMode !== 'open' ? 'true' : 'false',
-            paymentsUrl: (sellsAccess(store) && signupUrl) || '',
+            paymentsUrl: (sellsAccess(store) && joinUrl(relayUrl)) || '',
             fees: sellsAccess(store)
               ? JSON.stringify(fees(store.payments))
               : '',
@@ -277,7 +290,7 @@ const shellQuote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`
 export const writePolicy = async (
   store: Store,
   members: Members | null,
-  signupUrl: string | null,
+  relayUrl: string | null,
 ) => {
   const now = Date.now() / 1000
   const allow = {
@@ -289,10 +302,10 @@ export const writePolicy = async (
     ),
   }
   const block = Object.fromEntries(store.blockedPubkeys.map((k) => [k, true]))
-  const msg =
-    sellsAccess(store) && signupUrl
-      ? `restricted: pay for write access at ${signupUrl}`
-      : 'blocked: this relay does not accept events from this pubkey'
+  const join = sellsAccess(store) && joinUrl(relayUrl)
+  const msg = join
+    ? `restricted: pay for write access at ${join}`
+    : 'blocked: this relay does not accept events from this pubkey'
   const allowed =
     store.writeMode === 'open'
       ? 'true'
@@ -324,7 +337,7 @@ export const writePolicy = async (
 let policyWrites = Promise.resolve()
 
 // the store and the sign-up state change independently, and both rewrite one file
-export const refreshPolicy = (signupUrl: string | null) =>
+export const refreshPolicy = (relayUrl: string | null) =>
   (policyWrites = policyWrites
     .catch(() => {})
     .then(async () => {
@@ -333,7 +346,7 @@ export const refreshPolicy = (signupUrl: string | null) =>
         await writePolicy(
           store,
           await signupState.read((s) => s.members).once(),
-          signupUrl,
+          relayUrl,
         )
     }))
 
