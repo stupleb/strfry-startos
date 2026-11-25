@@ -7,7 +7,6 @@ import { paidAccess } from './paidAccess'
 import { paidMembers } from './paidMembers'
 import { relayInfo } from './relayInfo'
 import { relayUrl } from './relayUrl'
-import { signupUrl } from './signupUrl'
 import { writeAccess } from './writeAccess'
 
 export const actions = sdk.Actions.of()
@@ -15,7 +14,6 @@ export const actions = sdk.Actions.of()
   .addAction(relayInfo)
   .addAction(relayUrl.action)
   .addAction(paidAccess)
-  .addAction(signupUrl.action)
   .addAction(paidMembers)
   .addAction(editPaidMember)
   .addAction(importPubkey)

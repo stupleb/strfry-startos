@@ -37,7 +37,7 @@ const server = (backend: Backend) =>
           rootCa: Value.textarea({
             name: i18n('Root CA'),
             description: i18n(
-              "Only for an https:// address whose certificate isn't public, such as ${name} on another StartOS reached at its LAN address. Paste the certificate of the authority that issued it, including the BEGIN and END lines. For another StartOS, that is the Root CA from About this Server on that server: open the downloaded file in a text editor and copy all of it. Leave empty for an address with a public certificate.",
+              "Only for an https:// address whose certificate isn't public, such as ${name} on another StartOS reached at its LAN address. Paste the certificate of the authority that issued it, including the BEGIN and END lines. For another StartOS, that is the Root CA from About this server on that server: open the downloaded file in a text editor and copy all of it. Leave empty for an address with a public certificate.",
               { name: backendNames[backend] },
             ),
             required: false,
@@ -206,7 +206,7 @@ const request = (
     throw new Error(
       /CERT|SELF_SIGNED|UNABLE_TO_(GET|VERIFY)/.test(String(e.code))
         ? i18n(
-            "strfry doesn't trust that server's certificate. Paste its Root CA, which for another StartOS is under About this Server on that server",
+            "strfry doesn't trust that server's certificate. Paste its Root CA, which for another StartOS is under About this server on that server",
           )
         : i18n(
             'Nothing answered at that address. Check it, and that the service is running there',
@@ -436,7 +436,7 @@ export const paidAccess = sdk.Action.withInput(
               'Saved, but Write Access lets anyone publish, so the sign-up page sells nothing. Set Write Access to the listed public keys to start selling.',
             )
           : i18n(
-              'Paid access is on. Give the Sign-up Page interface a public domain so people can reach it, and check Set Sign-up URL picks that address.',
+              "Paid access is on. The sign-up page is at /join on the relay's address: give the Relay interface a public domain so people can reach it, and check Set Relay URL picks that address.",
             )
       } ${destination}`,
       result: null,

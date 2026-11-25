@@ -1,9 +1,13 @@
 import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
-import { relayPort, signupPort } from './utils'
+import { relayPort } from './utils'
 
 export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
+  const paid = await storeJson
+    .read((s) => s.payments.backend !== 'off')
+    .const(effects)
+
   const relayMultiOrigin = await sdk.MultiHost.of(
     effects,
     'relay-multi',
@@ -12,9 +16,13 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
   const relay = sdk.createInterface(effects, {
     name: i18n('Relay'),
     id: 'relay',
-    description: i18n(
-      'The websocket address Nostr clients connect to. Opened in a browser, it shows the relay information page.',
-    ),
+    description: paid
+      ? i18n(
+          'The websocket address Nostr clients connect to. Opened in a browser, it shows the sign-up page, where people pay to publish.',
+        )
+      : i18n(
+          'The websocket address Nostr clients connect to. Opened in a browser, it shows the relay information page.',
+        ),
     type: 'api',
     masked: false,
     schemeOverride: null,
@@ -23,31 +31,5 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
     query: {},
   })
 
-  const receipts = [await relayMultiOrigin.export([relay])]
-
-  const paid = await storeJson
-    .read((s) => s.payments.backend !== 'off')
-    .const(effects)
-  if (paid) {
-    const signupMultiOrigin = await sdk.MultiHost.of(
-      effects,
-      'signup-multi',
-    ).bindPort(signupPort, { protocol: 'http' })
-    const signup = sdk.createInterface(effects, {
-      name: i18n('Sign-up Page'),
-      id: 'signup',
-      description: i18n(
-        'The public page where people pay for write access to the relay. Give it a public domain so they can reach it.',
-      ),
-      type: 'ui',
-      masked: false,
-      schemeOverride: null,
-      username: null,
-      path: '',
-      query: {},
-    })
-    receipts.push(await signupMultiOrigin.export([signup]))
-  }
-
-  return receipts
+  return [await relayMultiOrigin.export([relay])]
 })

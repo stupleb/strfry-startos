@@ -29,7 +29,6 @@ const payments = z.looseObject({
 
 const shape = z.looseObject({
   relayUrl: z.string().optional().catch(undefined),
-  signupUrl: z.string().optional().catch(undefined),
   info: info.catch(() => info.parse({})),
   writeMode: z.enum(['open', 'whitelist', 'inbox']).catch('whitelist'),
   allowedPubkeys: z.array(hexKey).catch([]),
