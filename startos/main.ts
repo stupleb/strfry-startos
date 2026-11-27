@@ -107,6 +107,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         command: ['strfry-signup'],
         env: {
           SIGNUP_LISTEN: `:${relayPort}`,
+          SIGNUP_TRUSTED_PROXIES: await sdk.getOsIp(effects),
           SIGNUP_RELAY_UPSTREAM: `http://127.0.0.1:${strfryPort}`,
           SIGNUP_ADMIN_LISTEN: `127.0.0.1:${signupAdminPort}`,
           SIGNUP_BLOCKED_FILE: `${etcMount}/blocked.json`,
